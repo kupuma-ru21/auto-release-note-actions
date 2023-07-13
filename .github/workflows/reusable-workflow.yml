@@ -5,7 +5,7 @@ on:
         required: true
         type: string
     secrets:
-      envPAT:
+      GITHUB_TOKEN:
         required: true
 
 jobs:
@@ -15,5 +15,5 @@ jobs:
     steps:
       - uses: actions/labeler@v4
         with:
-          repo-token: ${{ secrets.envPAT }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
           configuration-path: ${{ inputs.config-path }}
