@@ -11,10 +11,11 @@ on:
         required: true
 
 jobs:
-  triage:
+  create-release-tag:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/labeler@v4
-        with:
-          repo-token: ${{ secrets.token }}
-          configuration-path: ${{ inputs.config-path }}
+      - uses: actions/checkout@v3
+      - name: Get previous tag
+        id: pre_tag
+        run: |
+          echo "pre_tag=$(curl -H 'Accept: application/vnd.github.v3+json' -H 'Authorization: token ${{ secrets.token }}' https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r .tag_name)" >> $GITHUB_OUTPUT
