@@ -1,4 +1,5 @@
-name: Reusable workflow example
+# https://docs.github.com/ja/actions/using-workflows/reusing-workflows#creating-a-reusable-workflow
+name: Create release tag and release note.
 
 on:
   workflow_call:
@@ -31,6 +32,30 @@ jobs:
             pre_release_count=0
           fi
           echo "release_tag=$today-$(($pre_release_count + 1))" >> $GITHUB_OUTPUT
+
+      # 前回リリースからの差分をもとに、リリースノートの本文を生成する(https://docs.github.com/en/rest/releases/releases?apiVersion=2022-11-28#generate-release-notes-content-for-a-release)
+      # 1. curlを叩いて、リリースノートの本文を生成するためのjsonを取得
+
+      # 2. 「jq .body」でjsonのbodyを取り出す
+
+      # 3. sedでエスケープ処理を行う
+      # エスケープ処理の具体的な意図は以下。
+      # sed処理がない場合、bodyの値には「"<!-- Release notes generated using configuration in .github/release.yml at main -->\\n\\n## What's Changed\\n### Other Changes 🛠\\n* Revert \"chore: remove json\" by @kupuma-ru21 in https://github.com/kupuma-ru21/auto-release-note/pull/2\\n\\n\\n**Full Changelog**: https://github.com/kupuma-ru21/auto-release-note/compare/2023.07.12-1...2023.07.12-2"」のような文言が入ってくる
+      # bodyの値の中に「What's」という文言がある。「What's」内のシングルクオーテーションに起因し、後続の「Create Release」のステップで、syntax errorが発生する。
+      # 「Create Release」のステップで、syntax errorが発生する理由は以下。
+      # 「Create Release」のステップで、-dコマンドを使用し、送信するデータをシングルクオーテーションで囲ってる(シングルクオーテーションで囲ってる理由は、「Create Release」のコメントに記載)
+      # 送信するデータをシングルクオーテーションで囲うことにより、「What's」内のシングルクオーテーションが、終了のシングルクオーテーションとして認識されてしまう。
+      # ex: -d '{..., "body": "... What's ..."}'
+      # '(<= 開始のシングルクオーテーション){..., "body": "... What'(<= ここが終了のシングルクオーテーションとして認識される)s ..."}'(<= 本来は末尾のシングルクオーテーションが終了のシングルクオーテーションとして認識されるべき)
+      # なので、sedを使用し「What's」内にあるシングルクオーテーションに対してエスケープ処理を行ってる。
+      # 「シングルクオーテーションに対してエスケープ処理を行う」に関しては右記を参照 > https://qiita.com/sumomo_99/items/5fb9c054c542456a6cdc
+
+      # 4. awkを使用し、bodyの値を囲ってるダブルクオーテーションを削除
+      # bodyの値は、後続の「Create Release」のステップで、「steps.release_note.outputs.release_note」として使用されてる > "body": "${{ steps.release_note.outputs.release_note }}"
+      # awkを使用しない場合、以下のようになり、syntax errorが発生する
+      # -d `{..., "body": ""bodyの値""}`
+      # "(<= 開始のダブルクオーテーション)"(<= 本来は文字列として扱われるべきだが、終了のダブルクオーテーションとして扱われてしまう)bodyの値""(<= 終了のダブルクオーテーションとして扱われるべき、ダブルクオーテーション)
+      # なので、syntax errorを回避するため、awkを使用してる
 
       - name: Generate release note
         id: release_note
